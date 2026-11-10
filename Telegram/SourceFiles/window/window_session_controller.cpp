@@ -4351,7 +4351,9 @@ bool CheckAndJumpToNearChatsFilter(
 	if (changed >= int(list->size()) || changed < 0) {
 		return false;
 	}
-	if (changed > Data::PremiumLimits(session).dialogFiltersCurrent()) {
+	// TelegramPlus: the built-in local folders don't count towards the limit.
+	if (changed > (Data::PremiumLimits(session).dialogFiltersCurrent()
+		+ Data::kLocalFiltersCount)) {
 		return false;
 	}
 	if (jump) {

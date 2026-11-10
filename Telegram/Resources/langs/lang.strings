@@ -1851,6 +1851,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_info_link_topic_label" = "This topic link will only work for group members";
 "lng_info_location_label" = "Location";
 "lng_info_about_label" = "Description";
+"lng_plus_info_id_label" = "ID";
+"lng_plus_info_bot_api_id_label" = "Bot API ID";
+"lng_plus_info_topic_id_label" = "Topic ID";
+"lng_plus_info_details_label" = "Details";
+"lng_plus_info_copy_id" = "Copy ID";
+"lng_plus_context_copy_message_id" = "Copy Message ID";
+"lng_plus_go_to_first_message" = "Go to First Message";
 "lng_info_work_open" = "Open";
 "lng_info_work_closed" = "Closed";
 "lng_info_hours_label" = "Business hours";

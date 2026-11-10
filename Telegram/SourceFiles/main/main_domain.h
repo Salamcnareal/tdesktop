@@ -39,6 +39,12 @@ public:
 	static constexpr auto kMaxAccounts = 3;
 	static constexpr auto kPremiumMaxAccounts = 6;
 
+	// TelegramPlus: the number of accounts is not limited by the product
+	// (kMaxAccounts / kPremiumMaxAccounts are kept only for the stock Premium
+	// promo texts). This is just a sanity bound for the account indexes that
+	// are read from / erased in the local storage.
+	static constexpr auto kAccountsHardLimit = 1000;
+
 	explicit Domain(const QString &dataName);
 	~Domain();
 

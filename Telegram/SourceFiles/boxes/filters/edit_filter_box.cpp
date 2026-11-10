@@ -1143,6 +1143,10 @@ void EditExistingFilter(
 		FilterId id) {
 	Expects(id != 0);
 
+	if (Data::IsLocalFilterId(id)) {
+		// TelegramPlus: the built-in local folders can't be edited.
+		return;
+	}
 	const auto session = &window->session();
 	const auto &list = session->data().chatsFilters().list();
 	const auto i = ranges::find(list, id, &Data::ChatFilter::id);

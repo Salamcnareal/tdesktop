@@ -71,6 +71,13 @@ void AddPostLinkAction(
 	not_null<HistoryItem*> item,
 	Context context);
 
+// TelegramPlus: "Copy Message ID", only for messages that have a real
+// (server) id.
+void AddCopyMessageIdAction(
+	not_null<Ui::PopupMenu*> menu,
+	not_null<Window::SessionController*> controller,
+	not_null<HistoryItem*> item);
+
 void CopyPostLink(
 	not_null<Window::SessionController*> controller,
 	FullMsgId itemId,

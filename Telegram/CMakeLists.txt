@@ -1364,6 +1364,8 @@ PRIVATE
     info/profile/info_profile_members.h
     info/profile/info_profile_members_controllers.cpp
     info/profile/info_profile_members_controllers.h
+    info/profile/info_profile_plus.cpp
+    info/profile/info_profile_plus.h
     info/profile/info_profile_phone_menu.cpp
     info/profile/info_profile_phone_menu.h
     info/profile/info_profile_pills.cpp

@@ -551,7 +551,8 @@ not_null<Ui::VerticalLayout*> SetupFoldersList(
 	};
 	const auto &list = session->data().chatsFilters().list();
 	for (const auto &filter : list) {
-		if (filter.id()) {
+		// TelegramPlus: the built-in local folders aren't managed here.
+		if (filter.id() && !Data::IsLocalFilterId(filter.id())) {
 			addFilter(filter);
 		}
 	}

@@ -1398,6 +1398,15 @@ void AddMessageActions(
 		const ContextMenuRequest &request,
 		not_null<ListWidget*> list) {
 	AddPostLinkAction(menu, request);
+	if (request.item
+		&& request.selectedItems.empty()
+		&& request.pointState != PointState::Outside) {
+		// TelegramPlus.
+		AddCopyMessageIdAction(
+			menu,
+			request.navigation->parentController(),
+			request.item);
+	}
 	AddForwardAction(menu, request, list);
 	AddOfferAction(menu, request, list);
 	AddSendNowAction(menu, request, list);
@@ -1661,6 +1670,26 @@ void AddPostLinkAction(
 			: tr::lng_context_copy_post_link)(tr::now),
 		[=] { CopyPostLink(controller, itemId, context); },
 		&st::menuIconLink);
+}
+
+void AddCopyMessageIdAction(
+		not_null<Ui::PopupMenu*> menu,
+		not_null<Window::SessionController*> controller,
+		not_null<HistoryItem*> item) {
+	if (!item->isRegular()) {
+		return;
+	}
+	const auto id = QString::number(item->id.bare);
+	const auto weak = base::make_weak(controller);
+	menu->addAction(
+		tr::lng_plus_context_copy_message_id(tr::now),
+		[=] {
+			QGuiApplication::clipboard()->setText(id);
+			if (const auto strong = weak.get()) {
+				strong->showToast(tr::lng_text_copied(tr::now));
+			}
+		},
+		&st::menuIconCopy);
 }
 
 std::optional<QString> CurrentVoiceTimecode(FullMsgId itemId) {

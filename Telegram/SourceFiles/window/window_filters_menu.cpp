@@ -360,13 +360,24 @@ void FiltersMenu::refresh() {
 	_reorder->clearPinnedIntervals();
 	const auto maxLimit = (reorderAll ? 1 : 0)
 		+ Data::PremiumLimits(&_session->session()).dialogFiltersCurrent();
-	const auto premiumFrom = (reorderAll ? 0 : 1) + maxLimit;
+	// TelegramPlus: the built-in local folders don't count towards the limit.
+	const auto premiumFrom = (reorderAll ? 0 : 1)
+		+ maxLimit
+		+ Data::kLocalFiltersCount;
 	if (!reorderAll) {
 		_reorder->addPinnedInterval(0, 1);
 	}
 	_reorder->addPinnedInterval(
 		premiumFrom,
 		std::max(1, int(filters->list().size()) - maxLimit));
+	{
+		// TelegramPlus: the built-in local folders always stay in the end.
+		const auto count = int(filters->list().size());
+		const auto firstLocal = Data::FirstLocalFilterIndex(filters->list());
+		if (firstLocal < count) {
+			_reorder->addPinnedInterval(firstLocal, count - firstLocal);
+		}
+	}
 
 	// Remember which folder holds keyboard focus so the roving Tab-stop can be
 	// re-established on its replacement after the rebuild: the new buttons are
@@ -747,10 +758,14 @@ void FiltersMenu::showMenu(QPoint position, FilterId id) {
 		st::popupMenuWithIcons);
 	const auto addAction = Ui::Menu::CreateAddActionCallback(_popupMenu);
 	if (id) {
-		addAction(
-			tr::lng_filters_context_edit(tr::now),
-			crl::guard(&_outer, [=] { EditExistingFilter(_session, id); }),
-			&st::menuIconEdit);
+		// TelegramPlus: the built-in local folders can't be edited or removed.
+		const auto local = Data::IsLocalFilterId(id);
+		if (!local) {
+			addAction(
+				tr::lng_filters_context_edit(tr::now),
+				crl::guard(&_outer, [=] { EditExistingFilter(_session, id); }),
+				&st::menuIconEdit);
+		}
 
 		auto filteredChats = [=] {
 			return _session->session().data().chatsFilters().chatsList(id);
@@ -761,14 +776,16 @@ void FiltersMenu::showMenu(QPoint position, FilterId id) {
 			std::move(filteredChats),
 			addAction);
 
-		addAction({
-			.text = tr::lng_filters_context_remove(tr::now),
-			.handler = crl::guard(&_outer, [=, this] {
-				_removeApi.request(base::make_weak(&_outer), _session, id);
-			}),
-			.icon = &st::menuIconDeleteAttention,
-			.isAttention = true,
-		});
+		if (!local) {
+			addAction({
+				.text = tr::lng_filters_context_remove(tr::now),
+				.handler = crl::guard(&_outer, [=, this] {
+					_removeApi.request(base::make_weak(&_outer), _session, id);
+				}),
+				.icon = &st::menuIconDeleteAttention,
+				.isAttention = true,
+			});
+		}
 	} else {
 		addAction(
 			tr::lng_filters_setup_menu(tr::now),

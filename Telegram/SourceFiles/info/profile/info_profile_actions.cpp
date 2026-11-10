@@ -65,6 +65,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/channel_statistics/earn/info_channel_earn_list.h"
 #include "info/profile/info_profile_icon.h"
 #include "info/profile/info_profile_phone_menu.h"
+#include "info/profile/info_profile_plus.h"
 #include "info/profile/info_profile_text.h"
 #include "info/profile/info_profile_values.h"
 #include "info/profile/info_profile_widget.h"
@@ -1898,6 +1899,52 @@ Section DetailsFiller::makeInfo() {
 			setupAboutContextMenu(about.text, AboutWithAdvancedValue(_peer));
 			SetupAboutPeerIdDrag(about.text, _peer);
 		}
+	}
+	{
+		// TelegramPlus: always show the identifiers and the technical details
+		// of every user, bot, group and channel. A click on an id copies it.
+		const auto addIdLine = [&](
+				rpl::producer<QString> &&label,
+				const QString &id) {
+			const auto url = u"internal:~peer_id~:copy:"_q + id;
+			const auto line = addInfoOneLine(
+				std::move(label),
+				rpl::single(tr::link(id, url)),
+				tr::lng_plus_info_copy_id(tr::now));
+			const auto text = line.text;
+			text->setLink(
+				1,
+				std::make_shared<DraggableUrlClickHandler>(url, id));
+			text->setContextMenuHook([=](
+					Ui::FlatLabel::ContextMenuRequest request) {
+				if (!request.selection.empty()) {
+					text->fillContextMenu(request);
+					return;
+				}
+				request.menu->addAction(
+					tr::lng_plus_info_copy_id(tr::now),
+					[=] {
+						Core::App().openInternalUrl(
+							url,
+							QVariant::fromValue(ClickHandlerContext{
+								.sessionWindow = weak,
+							}));
+					});
+			});
+		};
+		addIdLine(tr::lng_plus_info_id_label(), PlusPeerIdText(_peer));
+		const auto botApiId = PlusBotApiIdText(_peer);
+		if (!botApiId.isEmpty()) {
+			addIdLine(tr::lng_plus_info_bot_api_id_label(), botApiId);
+		}
+		if (_topic) {
+			addIdLine(
+				tr::lng_plus_info_topic_id_label(),
+				QString::number(_topic->rootId().bare));
+		}
+		addInfoLine(
+			tr::lng_plus_info_details_label(),
+			PlusDetailsValue(_peer));
 	}
 	raw->toggleOn(tracker.atLeastOneShownValue());
 	raw->finishAnimating();

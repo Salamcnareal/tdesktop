@@ -774,7 +774,18 @@ void AccentColors::clear(EmbeddedType type) {
 
 std::optional<QColor> AccentColors::get(EmbeddedType type) const {
 	const auto i = _data.find(type);
-	return (i != end(_data)) ? std::make_optional(i->second) : std::nullopt;
+	if (i != end(_data)) {
+		return std::make_optional(i->second);
+	}
+	// TelegramPlus: until the user picks an accent color the dark themes
+	// use violet instead of blue. Both colors are the stock violet options
+	// from DefaultAccentColors(), so Settings show them as the chosen ones.
+	if (type == EmbeddedType::Night) {
+		return std::make_optional(style::ColorFromHex("917bbd"));
+	} else if (type == EmbeddedType::NightGreen) {
+		return std::make_optional(style::ColorFromHex("a58ed2"));
+	}
+	return std::nullopt;
 }
 
 } // namespace Theme

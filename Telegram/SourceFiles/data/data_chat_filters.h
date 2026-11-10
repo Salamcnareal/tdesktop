@@ -36,6 +36,19 @@ struct ChatFilterTitle {
 
 [[nodiscard]] TextWithEntities ForceCustomEmojiStatic(TextWithEntities text);
 
+// TelegramPlus: built-in local folders (People / Groups / Bots).
+// They exist only in this client: they are never sent to the server, can't
+// be edited or removed and always follow the cloud folders in the list.
+// Cloud folder ids are small (2..255), so these ids never collide with them.
+inline constexpr auto kLocalFilterPeopleId = FilterId(1001);
+inline constexpr auto kLocalFilterGroupsId = FilterId(1002);
+inline constexpr auto kLocalFilterBotsId = FilterId(1003);
+inline constexpr auto kLocalFiltersCount = 3;
+
+[[nodiscard]] inline constexpr bool IsLocalFilterId(FilterId id) {
+	return (id >= kLocalFilterPeopleId) && (id <= kLocalFilterBotsId);
+}
+
 class ChatFilter final {
 public:
 	enum class Flag : ushort {
@@ -145,6 +158,14 @@ struct TagColorChanged final {
 	FilterId filterId = 0;
 	bool colorExistenceChanged = false;
 };
+
+// TelegramPlus: the folders that are stored in the cloud and count towards
+// the folders limit - neither "All chats" nor the built-in local ones.
+[[nodiscard]] int CloudFiltersCount(const std::vector<ChatFilter> &list);
+
+// TelegramPlus: index of the first built-in local folder in the list,
+// list.size() if there are none of them.
+[[nodiscard]] int FirstLocalFilterIndex(const std::vector<ChatFilter> &list);
 
 class ChatFilters final {
 public:

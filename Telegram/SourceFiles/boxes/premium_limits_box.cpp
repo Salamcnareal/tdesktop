@@ -792,9 +792,8 @@ void FiltersLimitBox(
 	const auto limits = Data::PremiumLimits(session);
 	const auto defaultLimit = float64(limits.dialogFiltersDefault());
 	const auto premiumLimit = float64(limits.dialogFiltersPremium());
-	const auto cloud = int(ranges::count_if(
-		session->data().chatsFilters().list(),
-		[](const Data::ChatFilter &f) { return f.id() != FilterId(); }));
+	const auto cloud = Data::CloudFiltersCount(
+		session->data().chatsFilters().list());
 	const auto current = float64(filtersCountOverride.value_or(cloud));
 
 	auto text = rpl::combine(

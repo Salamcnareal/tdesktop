@@ -82,10 +82,14 @@ void ShowMenu(
 		state->menu.get());
 
 	if (id) {
-		addAction(
-			tr::lng_filters_context_edit(tr::now),
-			[=] { EditExistingFilter(controller, id); },
-			&st::menuIconEdit);
+		// TelegramPlus: the built-in local folders can't be edited or removed.
+		const auto local = Data::IsLocalFilterId(id);
+		if (!local) {
+			addAction(
+				tr::lng_filters_context_edit(tr::now),
+				[=] { EditExistingFilter(controller, id); },
+				&st::menuIconEdit);
+		}
 
 		MarkAsReadMenu::AddChatListAction(
 			controller,
@@ -93,15 +97,20 @@ void ShowMenu(
 			[=] { return session->data().chatsFilters().chatsList(id); },
 			addAction);
 
-		auto showRemoveBox = [=] {
-			state->removeApi.request(base::make_weak(parent), controller, id);
-		};
-		addAction({
-			.text = tr::lng_filters_context_remove(tr::now),
-			.handler = std::move(showRemoveBox),
-			.icon = &st::menuIconDeleteAttention,
-			.isAttention = true,
-		});
+		if (!local) {
+			auto showRemoveBox = [=] {
+				state->removeApi.request(
+					base::make_weak(parent),
+					controller,
+					id);
+			};
+			addAction({
+				.text = tr::lng_filters_context_remove(tr::now),
+				.handler = std::move(showRemoveBox),
+				.icon = &st::menuIconDeleteAttention,
+				.isAttention = true,
+			});
+		}
 	} else {
 		auto openFiltersSettings = [=] {
 			const auto filters = &session->data().chatsFilters();
@@ -149,7 +158,10 @@ void ShowFiltersListMenu(
 	const auto reorderAll = session->user()->isPremium();
 	const auto maxLimit = (reorderAll ? 1 : 0)
 		+ Data::PremiumLimits(session).dialogFiltersCurrent();
-	const auto premiumFrom = (reorderAll ? 0 : 1) + maxLimit;
+	// TelegramPlus: the built-in local folders don't count towards the limit.
+	const auto premiumFrom = (reorderAll ? 0 : 1)
+		+ maxLimit
+		+ Data::kLocalFiltersCount;
 
 	for (auto i = 0; i < list.size(); ++i) {
 		const auto title = list[i].title();
@@ -412,7 +424,11 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 			const auto reorderAll = session->user()->isPremium();
 			const auto maxLimit = (reorderAll ? 1 : 0)
 				+ Data::PremiumLimits(session).dialogFiltersCurrent();
-			const auto premiumFrom = (reorderAll ? 0 : 1) + maxLimit;
+			// TelegramPlus: the built-in local folders don't count towards
+			// the limit.
+			const auto premiumFrom = (reorderAll ? 0 : 1)
+				+ maxLimit
+				+ Data::kLocalFiltersCount;
 			slider->setLockedFrom((premiumFrom >= list.size())
 				? 0
 				: premiumFrom);
@@ -428,6 +444,16 @@ not_null<Ui::RpWidget*> AddChatFiltersTabsStrip(
 				state->reorder->addPinnedInterval(
 					premiumFrom,
 					std::max(1, int(list.size()) - maxLimit));
+
+				// TelegramPlus: the built-in local folders always stay
+				// in the end.
+				const auto count = int(list.size());
+				const auto firstLocal = Data::FirstLocalFilterIndex(list);
+				if (firstLocal < count) {
+					state->reorder->addPinnedInterval(
+						firstLocal,
+						count - firstLocal);
+				}
 			}
 		}
 		if (trackActiveFilterAndUnreadAndReorder) {

@@ -97,6 +97,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/channel_statistics/earn/info_channel_earn_widget.h"
 #include "info/channel_statistics/earn/earn_icons.h"
 #include "info/profile/info_profile_cover.h"
+#include "info/profile/info_profile_plus.h"
 #include "info/profile/info_profile_values.h"
 #include "info/statistics/info_statistics_widget.h"
 #include "info/stories/info_stories_widget.h"
@@ -351,6 +352,8 @@ private:
 	void addBoostChat();
 	void addToggleFee();
 	void addSetPersonalChannel();
+	void addCopyId(); // TelegramPlus
+	void addGoToFirstMessage(); // TelegramPlus
 
 	[[nodiscard]] bool skipCreateActions() const;
 	[[nodiscard]] SendMenu::Details createSendMenuDetails() const;
@@ -1078,6 +1081,49 @@ void Filler::addExportChat() {
 		tr::lng_profile_export_chat(tr::now),
 		[=] { PeerMenuExportChat(navigation, peer); },
 		&st::menuIconExport);
+}
+
+// TelegramPlus: copy the id of the chat right from its menu. For groups
+// and channels this is the Bot API form (-100...), the one bots expect.
+void Filler::addCopyId() {
+	if (!_peer || _topic || _sublist) {
+		return;
+	}
+	const auto peer = not_null(_peer);
+	auto id = Info::Profile::PlusBotApiIdText(peer);
+	if (id.isEmpty()) {
+		id = Info::Profile::PlusPeerIdText(peer);
+	}
+	const auto navigation = _controller;
+	_addAction(tr::lng_plus_info_copy_id(tr::now), [=] {
+		QGuiApplication::clipboard()->setText(id);
+		navigation->showToast(tr::lng_text_copied(tr::now));
+	}, &st::menuIconCopy);
+}
+
+// TelegramPlus: jump to the very beginning of the chat. Telegram didn't
+// exist before August 2013, so the first message on or after that date
+// is the first message of the chat.
+void Filler::addGoToFirstMessage() {
+	if (!_peer || _topic || _sublist) {
+		return;
+	}
+	const auto peer = not_null(_peer);
+	const auto weak = base::make_weak(_controller);
+	_addAction(tr::lng_plus_go_to_first_message(tr::now), [=] {
+		const auto history = peer->owner().history(peer);
+		peer->session().api().resolveJumpToDate(
+			Dialogs::Key(history),
+			QDate(2013, 8, 1),
+			[=](not_null<PeerData*> found, MsgId id) {
+				if (const auto strong = weak.get()) {
+					strong->showPeerHistory(
+						found,
+						SectionShow::Way::Forward,
+						id);
+				}
+			});
+	}, &st::menuIconShowInChat);
 }
 
 void Filler::addTranslate() {
@@ -1922,6 +1968,7 @@ void Filler::fillContextMenuActions() {
 	addToggleUnreadMark();
 	addToggleTopicClosed();
 	addToggleFolder();
+	addCopyId();
 	if (const auto user = _peer->asUser()) {
 		if (!user->isContact()) {
 			addBlockUser();
@@ -1938,6 +1985,8 @@ void Filler::fillHistoryActions() {
 	addToggleMuteSubmenu(true);
 	addCreateTopic();
 	addInfo();
+	addCopyId();
+	addGoToFirstMessage();
 	addViewAsTopics();
 	addManageChat();
 	addStoryArchive();

@@ -3480,6 +3480,10 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				HistoryView::CopyPostLink(controller, itemId, HistoryView::Context::History);
 			}, &st::menuIconLink);
 		}
+		if (item && isUponSelected != 2 && isUponSelected != -2) {
+			// TelegramPlus.
+			HistoryView::AddCopyMessageIdAction(_menu.get(), controller, item);
+		}
 		if (isUponSelected > 1) {
 			if (selectedState.count > 0 && selectedState.canForwardCount == selectedState.count) {
 				_menu->addAction(tr::lng_context_forward_selected(tr::now), [=] {
@@ -3766,6 +3770,10 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 			_menu->addAction(item->history()->peer->isMegagroup() ? tr::lng_context_copy_message_link(tr::now) : tr::lng_context_copy_post_link(tr::now), [=] {
 				HistoryView::CopyPostLink(controller, itemId, HistoryView::Context::History);
 			}, &st::menuIconLink);
+		}
+		if (item && isUponSelected != 2 && isUponSelected != -2) {
+			// TelegramPlus.
+			HistoryView::AddCopyMessageIdAction(_menu.get(), controller, item);
 		}
 		if (sponsored) {
 			const auto hasAbout = ranges::any_of(

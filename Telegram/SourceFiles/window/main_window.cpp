@@ -914,7 +914,8 @@ void MainWindow::updateTitle() {
 		: Dialogs::Key();
 	const auto thread = key ? key.thread() : nullptr;
 	if (!thread) {
-		setTitle((user.isEmpty() ? u"Telegram"_q : user) + added + suffix);
+		// TelegramPlus: tell this window from the official client's one.
+		setTitle((user.isEmpty() ? u"TelegramPlus"_q : user) + added + suffix);
 		return;
 	}
 	const auto history = thread->owningHistory();

@@ -447,6 +447,10 @@ void RemoveChatFromFilters(not_null<PeerData*> peer) {
 			MTP_flags(MTPDupdateDialogFilter::Flag::f_filter),
 			MTP_int(filter.id()),
 			tl));
+		if (Data::IsLocalFilterId(filter.id())) {
+			// TelegramPlus: local folders are never sent to the server.
+			continue;
+		}
 		peer->session().api().request(MTPmessages_UpdateDialogFilter(
 			MTP_flags(MTPmessages_UpdateDialogFilter::Flag::f_filter),
 			MTP_int(filter.id()),

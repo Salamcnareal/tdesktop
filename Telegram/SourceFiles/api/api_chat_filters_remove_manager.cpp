@@ -60,6 +60,10 @@ void RemoveComplexChatFilter::request(
 		base::weak_qptr<Ui::RpWidget> widget,
 		base::weak_ptr<Window::SessionController> weak,
 		FilterId id) {
+	if (Data::IsLocalFilterId(id)) {
+		// TelegramPlus: the built-in local folders can't be removed.
+		return;
+	}
 	const auto session = &weak->session();
 	const auto &list = session->data().chatsFilters().list();
 	const auto i = ranges::find(list, id, &Data::ChatFilter::id);

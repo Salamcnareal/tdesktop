@@ -711,7 +711,7 @@ void EraseStorage(not_null<Main::Account*> account) {
 void EraseDomainStorage(
 		not_null<Main::Domain*> domain,
 		const QString &dataName) {
-	for (auto i = 0; i != Main::Domain::kPremiumMaxAccounts; ++i) {
+	for (auto i = 0; i != Main::Domain::kAccountsHardLimit; ++i) {
 		auto account = Main::Account(domain, dataName, i);
 		EraseStorage(&account);
 	}

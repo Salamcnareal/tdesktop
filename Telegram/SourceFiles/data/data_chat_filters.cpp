@@ -21,6 +21,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_unread_things.h"
 #include "ui/ui_utility.h"
 #include "ui/chat/more_chats_bar.h"
+#include "lang/lang_keys.h"
 #include "main/main_session.h"
 #include "main/main_app_config.h"
 #include "apiwrap.h"
@@ -38,7 +39,59 @@ constexpr auto kLoadExceptionsPerRequest = 100;
 		* crl::time(1000);
 }
 
+// TelegramPlus: the built-in local folders, in the order they are shown.
+constexpr auto kLocalFilterIds = std::array{
+	kLocalFilterPeopleId,
+	kLocalFilterGroupsId,
+	kLocalFilterBotsId,
+};
+
+[[nodiscard]] ChatFilter MakeLocalFilter(FilterId id) {
+	Expects(IsLocalFilterId(id));
+
+	using Flag = ChatFilter::Flag;
+	const auto people = (id == kLocalFilterPeopleId);
+	const auto groups = (id == kLocalFilterGroupsId);
+	auto title = people
+		? tr::lng_filters_name_people(tr::now)
+		: groups
+		? tr::lng_filters_type_groups(tr::now)
+		: tr::lng_filters_type_bots(tr::now);
+	// Archived chats stay in the archive, the same way as in "All chats".
+	auto flags = ChatFilter::Flags(Flag::NoArchived);
+	if (people) {
+		flags |= Flag::Contacts;
+		flags |= Flag::NonContacts;
+	} else if (groups) {
+		flags |= Flag::Groups;
+	} else {
+		flags |= Flag::Bots;
+	}
+	return ChatFilter(
+		id,
+		ChatFilterTitle{ TextWithEntities{ std::move(title) } },
+		QString(),
+		std::nullopt,
+		flags,
+		{},
+		{},
+		{});
+}
+
 } // namespace
+
+int CloudFiltersCount(const std::vector<ChatFilter> &list) {
+	return int(ranges::count_if(list, [](const ChatFilter &filter) {
+		return filter.id() && !IsLocalFilterId(filter.id());
+	}));
+}
+
+int FirstLocalFilterIndex(const std::vector<ChatFilter> &list) {
+	const auto i = ranges::find_if(list, [](const ChatFilter &filter) {
+		return IsLocalFilterId(filter.id());
+	});
+	return int(i - begin(list));
+}
 
 TextWithEntities ForceCustomEmojiStatic(TextWithEntities text) {
 	for (auto &entity : text.entities) {
@@ -489,10 +542,25 @@ void ChatFilters::requestToggleTags(bool value, Fn<void()> fail) {
 }
 
 void ChatFilters::received(const QVector<MTPDialogFilter> &list) {
-	auto position = 0;
-	auto changed = false;
+	// TelegramPlus: the cloud folders are followed by the built-in local
+	// ones. A local folder that is already in the list is kept as it is, so
+	// the chats pinned in it survive the reloads of the cloud folders.
+	auto parsedList = std::vector<ChatFilter>();
+	parsedList.reserve(int(list.size()) + int(kLocalFilterIds.size()));
 	for (const auto &filter : list) {
 		auto parsed = ChatFilter::FromTL(filter, _owner);
+		if (!IsLocalFilterId(parsed.id())) {
+			parsedList.push_back(std::move(parsed));
+		}
+	}
+	for (const auto id : kLocalFilterIds) {
+		const auto i = ranges::find(_list, id, &ChatFilter::id);
+		parsedList.push_back((i != end(_list)) ? *i : MakeLocalFilter(id));
+	}
+
+	auto position = 0;
+	auto changed = false;
+	for (auto &parsed : parsedList) {
 		const auto b = begin(_list) + position;
 		const auto e = end(_list);
 		const auto i = ranges::find(b, e, parsed.id(), &ChatFilter::id);
@@ -675,6 +743,10 @@ void ChatFilters::applyInsert(ChatFilter filter, int position) {
 }
 
 void ChatFilters::remove(FilterId id) {
+	if (IsLocalFilterId(id)) {
+		// TelegramPlus: the built-in local folders can't be removed.
+		return;
+	}
 	const auto i = ranges::find(_list, id, &ChatFilter::id);
 	if (i == end(_list)) {
 		return;
@@ -796,7 +868,23 @@ bool ChatFilters::applyChange(ChatFilter &filter, ChatFilter &&updated) {
 	return listUpdated;
 }
 
-bool ChatFilters::applyOrder(const QVector<MTPint> &order) {
+bool ChatFilters::applyOrder(const QVector<MTPint> &cloudOrder) {
+	// TelegramPlus: the server knows nothing about the built-in local
+	// folders, so an order that came from it doesn't mention them. Keep
+	// them after the cloud folders in that case.
+	auto order = cloudOrder;
+	for (const auto &filter : _list) {
+		const auto id = filter.id();
+		if (!IsLocalFilterId(id)) {
+			continue;
+		}
+		const auto mentioned = ranges::any_of(order, [&](const MTPint &v) {
+			return (v.v == id);
+		});
+		if (!mentioned) {
+			order.push_back(MTP_int(id));
+		}
+	}
 	if (order.size() != _list.size()) {
 		return false;
 	} else if (_list.empty()) {
@@ -875,16 +963,24 @@ void ChatFilters::saveOrder(
 	const auto api = &_owner->session().api();
 	api->request(_saveOrderRequestId).cancel();
 
+	// TelegramPlus: the full order is applied locally, but the built-in
+	// local folders are never sent to the server.
 	auto ids = QVector<MTPint>();
+	auto cloudIds = QVector<MTPint>();
 	ids.reserve(order.size());
+	cloudIds.reserve(order.size());
 	for (const auto id : order) {
 		ids.push_back(MTP_int(id));
+		if (!IsLocalFilterId(id)) {
+			cloudIds.push_back(MTP_int(id));
+		}
 	}
 	const auto wrapped = MTP_vector<MTPint>(ids);
+	const auto cloudWrapped = MTP_vector<MTPint>(cloudIds);
 
 	apply(MTP_updateDialogFilterOrder(wrapped));
 	_saveOrderRequestId = api->request(MTPmessages_UpdateDialogFiltersOrder(
-		wrapped
+		cloudWrapped
 	)).afterRequest(_saveOrderAfterId).send();
 }
 

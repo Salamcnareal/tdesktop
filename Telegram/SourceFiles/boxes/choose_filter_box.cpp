@@ -162,6 +162,10 @@ void ChangeFilterById(
 		bool add) {
 	Expects(filterId != 0);
 
+	if (Data::IsLocalFilterId(filterId)) {
+		// TelegramPlus: the built-in local folders are filled automatically.
+		return;
+	}
 	const auto list = history->owner().chatsFilters().list();
 	const auto i = ranges::find(list, filterId, &Data::ChatFilter::id);
 	if (i != end(list)) {
@@ -220,7 +224,9 @@ bool ChooseFilterValidator::canAdd() const {
 		return false;
 	}
 	for (const auto &filter : _history->owner().chatsFilters().list()) {
-		if (filter.id() && !filter.contains(_history)) {
+		if (filter.id()
+			&& !Data::IsLocalFilterId(filter.id())
+			&& !filter.contains(_history)) {
 			return true;
 		}
 	}
@@ -230,7 +236,7 @@ bool ChooseFilterValidator::canAdd() const {
 bool ChooseFilterValidator::canAdd(FilterId filterId) const {
 	Expects(filterId != 0);
 
-	if (communityAddBlocked()) {
+	if (communityAddBlocked() || Data::IsLocalFilterId(filterId)) {
 		return false;
 	}
 	const auto list = _history->owner().chatsFilters().list();
@@ -244,6 +250,9 @@ bool ChooseFilterValidator::canAdd(FilterId filterId) const {
 bool ChooseFilterValidator::canRemove(FilterId filterId) const {
 	Expects(filterId != 0);
 
+	if (Data::IsLocalFilterId(filterId)) {
+		return false;
+	}
 	const auto list = _history->owner().chatsFilters().list();
 	const auto i = ranges::find(list, filterId, &Data::ChatFilter::id);
 	if (i != end(list)) {
@@ -288,7 +297,7 @@ void FillChooseFilterMenu(
 	const auto suppressClose = menu->lifetime().make_state<bool>(false);
 	for (const auto &filter : list) {
 		const auto id = filter.id();
-		if (!id) {
+		if (!id || Data::IsLocalFilterId(id)) {
 			continue;
 		}
 
@@ -355,7 +364,7 @@ void FillChooseFilterMenu(
 	const auto limit = [session = &controller->session()] {
 		return Data::PremiumLimits(session).dialogFiltersCurrent();
 	};
-	if ((list.size() - 1) < limit()) {
+	if (Data::CloudFiltersCount(list) < limit()) {
 		menu->addAction(tr::lng_filters_create(tr::now), [=] {
 			const auto strong = weak.get();
 			if (!strong) {
@@ -363,7 +372,7 @@ void FillChooseFilterMenu(
 			}
 			const auto session = &strong->session();
 			const auto &list = session->data().chatsFilters().list();
-			if ((list.size() - 1) >= limit()) {
+			if (Data::CloudFiltersCount(list) >= limit()) {
 				return;
 			}
 			const auto chooseNextId = [&] {
@@ -422,7 +431,7 @@ bool FillChooseFilterWithAdminedGroupsMenu(
 	auto added = 0;
 	for (const auto &filter : list) {
 		const auto id = filter.id();
-		if (!id) {
+		if (!id || Data::IsLocalFilterId(id)) {
 			continue;
 		}
 		auto canRestrictList = std::vector<not_null<PeerData*>>();
