@@ -36,6 +36,8 @@ jobs:
       CONFIGURATION: ${{ inputs.configuration }}
       API_ID: ${{ secrets.TDESKTOP_API_ID }}
       API_HASH: ${{ secrets.TDESKTOP_API_HASH }}
+      # Rust debug builds of the helper tools keep much less on disk this way.
+      CARGO_INCREMENTAL: "0"
 
     defaults:
       run:
@@ -50,6 +52,50 @@ jobs:
             echo "::error::Add the TDESKTOP_API_ID and TDESKTOP_API_HASH repository secrets (get them at https://my.telegram.org/apps)."
             exit 1
           fi
+
+      # Building every library from scratch ran out of disk on the hosted
+      # runner at the very last stage. Remove preinstalled toolchains this
+      # build never uses. Python, Perl, LLVM, .NET and Visual Studio stay.
+      - name: Free runner disk space.
+        shell: pwsh
+        run: |
+          function Show-Free($label) {
+            Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Free -ne $null } | ForEach-Object {
+              "{0} {1}: {2:N1} GB free of {3:N1}" -f $label, $_.Name, ($_.Free / 1GB), (($_.Free + $_.Used) / 1GB)
+            }
+          }
+          Show-Free 'before'
+          $paths = @(
+            'C:\Android',
+            'C:\Program Files (x86)\Android',
+            'C:\ghcup',
+            'C:\Miniconda',
+            'C:\Julia',
+            'C:\vcpkg',
+            'C:\SeleniumWebDrivers',
+            'C:\selenium',
+            'C:\tools\php',
+            'C:\Program Files\MongoDB',
+            'C:\Program Files\PostgreSQL',
+            'C:\Program Files\MySQL',
+            'C:\Program Files\Azure Cosmos DB Emulator',
+            'C:\hostedtoolcache\windows\CodeQL',
+            'C:\hostedtoolcache\windows\go',
+            'C:\hostedtoolcache\windows\Ruby',
+            'C:\hostedtoolcache\windows\PyPy',
+            'C:\hostedtoolcache\windows\node',
+            'C:\hostedtoolcache\windows\Java_Temurin-Hotspot_jdk',
+            'C:\Users\runneradmin\.rustup',
+            'C:\Users\runneradmin\.cargo',
+            'C:\Users\Default\.rustup',
+            'C:\Users\Default\.cargo'
+          ) | Where-Object { Test-Path $_ }
+          $paths | ForEach-Object -Parallel {
+            cmd /c rmdir /s /q "$_" 2>&1 | Out-Null
+            "removed $_ (still there: $(Test-Path $_))"
+          } -ThrottleLimit 8
+          Show-Free 'after'
+          exit 0
 
       - name: Prepare directories.
         run: |
@@ -135,6 +181,15 @@ jobs:
         if: ${{ inputs.configuration != 'Debug' }}
         run: |
           %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent
+
+      - name: Disk report.
+        if: ${{ always() }}
+        shell: pwsh
+        run: |
+          Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Free -ne $null } | ForEach-Object {
+            "{0}: {1:N1} GB free of {2:N1}" -f $_.Name, ($_.Free / 1GB), (($_.Free + $_.Used) / 1GB)
+          }
+          exit 0
 
       - name: Free up some disk space.
         shell: bash
